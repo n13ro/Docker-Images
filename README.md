@@ -4,7 +4,7 @@
 Чтобы запустить образ введите команду
 
 ```code
-docker compose -f dockercompese.{name_image}.yml up -d
+docker compose -f docker-compese.{name_image}.yml up -d
 ```
 ## Обязательно
 ```-f``` — указывает файл с кастомным названием

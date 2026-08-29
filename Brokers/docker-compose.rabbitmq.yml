@@ -1,0 +1,16 @@
+services:
+  rabbitmq:
+      image: rabbitmq:3-management
+      container_name: rabbitmq-dev
+      ports:
+        - "5672:5672"    # AMQP
+        - "15672:15672"  # Web UI
+      environment:
+        RABBITMQ_DEFAULT_USER: devuser
+        RABBITMQ_DEFAULT_PASS: devpassword123
+      volumes:
+        - rabbitmq-data:/var/lib/rabbitmq
+      restart: unless-stopped
+
+volumes:
+  rabbitmq-data:

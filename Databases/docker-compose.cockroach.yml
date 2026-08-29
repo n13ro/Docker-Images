@@ -1,0 +1,14 @@
+services:
+  cockroachdb:
+    image: cockroachdb/cockroach:latest-v23.1
+    container_name: cockroachdb-dev
+    ports:
+      - "26257:26257" # SQL
+      - "8080:8080"   # UI
+    command: start-single-node --insecure
+    volumes:
+      - cockroachdb-data:/cockroach/cockroach-data
+    restart: unless-stopped
+
+volumes:
+  cockroachdb-data:

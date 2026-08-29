@@ -1,0 +1,15 @@
+services:
+  nats:
+    image: nats:latest
+    container_name: nats-dev
+    ports:
+      - "4222:4222"   # клиенты
+      - "8222:8222"   # HTTP мониторинг
+      - "6222:6222"   # кластер
+    command: "--js --http_port 8222 --store_dir /data/jetstream"
+    volumes:
+      - nats-data:/data/jetstream
+    restart: unless-stopped
+
+volumes:
+  nats-data:

@@ -1,0 +1,89 @@
+name: garage
+
+services:
+  init:
+    image: alpine:3.20
+    volumes:
+      - garage-config:/etc/garage-config
+    environment:
+      RPC_SECRET: ${RPC_SECRET}
+      ADMIN_TOKEN: ${ADMIN_TOKEN}
+      METRICS_TOKEN: ${METRICS_TOKEN}
+      DATA_DIR: ${DATA_DIR:-/var/lib/garage/data}
+      META_DIR: ${META_DIR:-/var/lib/garage/meta}
+      S3_REGION: ${S3_REGION:-garage}
+      S3_ROOT_DOMAIN: ${S3_ROOT_DOMAIN:-.s3.garage.localhost}
+      WEB_ROOT_DOMAIN: ${WEB_ROOT_DOMAIN:-.web.garage.localhost}
+    command: |
+      sh -c 'cat > /etc/garage-config/garage.toml <<EOF
+      metadata_dir = "$$META_DIR"
+      data_dir = "$$DATA_DIR"
+      db_engine = "sqlite"
+
+      replication_factor = 1
+
+      rpc_bind_addr = "[::]:3901"
+      rpc_public_addr = "127.0.0.1:3901"
+      rpc_secret = "$$RPC_SECRET"
+
+      [s3_api]
+      s3_region = "$$S3_REGION"
+      api_bind_addr = "[::]:3900"
+      root_domain = "$$S3_ROOT_DOMAIN"
+
+      [s3_web]
+      bind_addr = "[::]:3902"
+      root_domain = "$$WEB_ROOT_DOMAIN"
+      index = "index.html"
+
+      [admin]
+      api_bind_addr = "[::]:3903"
+      admin_token = "$$ADMIN_TOKEN"
+      metrics_token = "$$METRICS_TOKEN"
+      EOF'
+    restart: "no"
+
+  garage:
+    image: dxflrs/garage:v2.3.0
+    container_name: garage
+    depends_on:
+      init:
+        condition: service_completed_successfully
+    ports:
+      - "3900:3900"   # S3 API
+      - "3902:3902"   # S3 websites
+      - "3903:3903"   # Admin API + метрики
+      # 3901 (RPC)
+    volumes:
+      - garage-config:/etc/garage-config:ro
+      - garage-data:${DATA_DIR:-/var/lib/garage/data}
+      - garage-meta:${META_DIR:-/var/lib/garage/meta}
+    environment:
+      GARAGE_CONFIG_FILE: /etc/garage-config/garage.toml
+      GARAGE_DEFAULT_ACCESS_KEY: ${GARAGE_DEFAULT_ACCESS_KEY}
+      GARAGE_DEFAULT_SECRET_KEY: ${GARAGE_DEFAULT_SECRET_KEY}
+      GARAGE_DEFAULT_BUCKET: ${GARAGE_DEFAULT_BUCKET:-default-bucket}
+    command: /garage server --single-node --default-bucket
+    restart: unless-stopped
+
+  # Веб-интерфейс: http://localhost:3909
+  webui:
+    image: khairul169/garage-webui:latest
+    container_name: garage-webui
+    depends_on:
+      - garage
+    ports:
+      - "3909:3909"
+    environment:
+      API_BASE_URL: "http://garage:3903"
+      API_ADMIN_KEY: ${ADMIN_TOKEN}
+      S3_REGION: ${S3_REGION:-garage}
+      S3_ENDPOINT_URL: "http://garage:3900"
+      # Опционально: базовая авторизация username:bcrypt_hash
+      # AUTH_USER_PASS: "admin:$2y$10$..."
+    restart: unless-stopped
+
+volumes:
+  garage-config:
+  garage-data:
+  garage-meta:

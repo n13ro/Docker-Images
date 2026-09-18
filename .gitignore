@@ -1,1 +1,3 @@
 ﻿S3 Storages/minio-data
+S3 Storages/Minio/minio-data
+*.env

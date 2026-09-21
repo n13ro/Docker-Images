@@ -4,7 +4,9 @@
 
 ```bash
 # 1. Сгенерируйте секреты и положите в .env
-cp .env.example .env
+sh ./gen.sh
+# или
+cp .env.example .env 
 # отредактируйте .env, либо же сгенерируйте сразу в .env:
 cat > .env <<EOF
 RPC_SECRET=$(openssl rand -hex 32)

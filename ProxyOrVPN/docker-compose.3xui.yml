@@ -1,0 +1,14 @@
+services:
+  3x-ui:
+    image: ghcr.io/mhsanaei/3x-ui:latest
+    container_name: 3x-ui
+    restart: unless-stopped
+    volumes:
+      - ./db:/etc/x-ui          # база данных и настройки панели
+      - ./cert:/root/cert       # сертификаты (свои)
+    environment:
+      XRAY_VLESS_AREALITY_FLOW: "xtls-rprx-vision"
+    ports:
+      - "2053:2053"   # веб-панель
+      - "2096:2096"   # порт подключения VLESS/WS (пример)
+    tty: true

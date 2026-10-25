@@ -1,90 +1,67 @@
-
-networks:
-  observability:
-    driver: bridge
-
-volumes:
-  prometheus_data:
-  grafana_data:
-  loki_data:
+version: '3.8'
 
 services:
-  # ==========================================
-  # 1. Grafana Loki (хранение и индексация логов)
-  # ==========================================
   loki:
-    image: grafana/loki:3.7.0
-    container_name: observability-loki
-    networks:
-      - observability
+    image: grafana/loki:2.9.0
+    container_name: loki
     ports:
       - "3100:3100"
-    command: -config.file=/etc/loki/local-config.yaml
     volumes:
-      - loki_data:/loki
-      - ./loki-config.yaml:/etc/loki/local-config.yaml:ro
-    healthcheck:
-      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:3100/ready || exit 1"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
-  # ==========================================
-  # 2. Grafana Alloy (сбор и отправка логов в Loki)
-  # ==========================================
-  alloy:
-    image: grafana/alloy:v1.21.1
-    container_name: observability-alloy
+      - ./loki-config.yaml:/etc/loki/config.yaml
+      - loki-data:/loki
+    command: -config.file=/etc/loki/config.yaml
+    restart: unless-stopped
     networks:
-      - observability
+      - monitoring
+
+  promtail:
+    image: grafana/promtail:2.9.0
+    container_name: promtail
     volumes:
-      - /var/run/docker.sock:/var/run/docker.sock:ro
-      - ./config.alloy:/etc/alloy/config.alloy:ro
-    command:
-      - "run"
-      - "/etc/alloy/config.alloy"
-      - "--server.http.listen-addr=0.0.0.0:12345"
+      - ./promtail-config.yaml:/etc/promtail/config.yaml
+      - /var/log:/var/log:ro # Сбор системных логов хоста
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro # Сбор логов Docker-контейнеров
+      - /var/run/docker.sock:/var/run/docker.sock:ro # Метаданные Docker
+    command: -config.file=/etc/promtail/config.yaml
     depends_on:
       - loki
-
-  # ==========================================
-  # 3. Prometheus (сбор метрик)
-  # ==========================================
-  prometheus:
-    image: prom/prometheus:v3.15.0
-    container_name: observability-prometheus
+    restart: unless-stopped
     networks:
-      - observability
+      - monitoring
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
     ports:
       - "9090:9090"
     volumes:
-      - prometheus_data:/prometheus
       - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
-    command:
-      - "--config.file=/etc/prometheus/prometheus.yml"
-      - "--storage.tsdb.retention.time=15d"
-      - "--web.enable-lifecycle"
-    depends_on:
-      - loki
-
-  # ==========================================
-  # 4. Grafana (визуализация метрик и логов)
-  # ==========================================
-  grafana:
-    image: grafana/grafana:13.2.3
-    container_name: observability-grafana
+      - prometheus-data:/prometheus
+    restart: unless-stopped
     networks:
-      - observability
+      - monitoring
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
     ports:
       - "3000:3000"
     environment:
-      - GF_SECURITY_ADMIN_USER=admin
       - GF_SECURITY_ADMIN_PASSWORD=admin
-      - GF_AUTH_ANONYMOUS_ENABLED=true
-      - GF_AUTH_ANONYMOUS_ORG_ROLE=Viewer
     volumes:
-      - grafana_data:/var/lib/grafana
-      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - grafana-data:/var/lib/grafana
     depends_on:
       - prometheus
       - loki
+    restart: unless-stopped
+    networks:
+      - monitoring
+
+networks:
+  monitoring:
+    driver: bridge
+
+volumes:
+  loki-data:
+  prometheus-data:
+  grafana-data:

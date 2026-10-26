@@ -19,9 +19,9 @@ services:
     container_name: promtail
     volumes:
       - ./promtail-config.yaml:/etc/promtail/config.yaml
-      - /var/log:/var/log:ro # Сбор системных логов хоста
-      - /var/lib/docker/containers:/var/lib/docker/containers:ro # Сбор логов Docker-контейнеров
-      - /var/run/docker.sock:/var/run/docker.sock:ro # Метаданные Docker
+      - /var/log:/var/log:ro
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
     command: -config.file=/etc/promtail/config.yaml
     depends_on:
       - loki
@@ -42,14 +42,16 @@ services:
       - monitoring
 
   grafana:
-    image: grafana/grafana:latest
+    image: grafana/grafana:latest # <--- ИСПРАВЛЕНО: теперь это Grafana, а не Tempo
     container_name: grafana
     ports:
       - "3000:3000"
     environment:
       - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_PLUGINS_ALLOW_LOADING_UNSIGNED_PLUGINS=prometheus,tempo-
     volumes:
       - grafana-data:/var/lib/grafana
+      - ./grafana-datasources.yaml:/etc/grafana/provisioning/datasources/datasources.yaml # <--- ИСПРАВЛЕНО имя файла
     depends_on:
       - prometheus
       - loki

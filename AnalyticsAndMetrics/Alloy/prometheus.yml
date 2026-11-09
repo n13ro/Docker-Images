@@ -1,0 +1,51 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    cluster: 'instans-cluster'
+    environment: 'development'
+    region: 'local'
+
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: []
+
+rule_files:
+  # - "alert_rules.yml"
+
+scrape_configs:
+  # ─── instans ───
+  - job_name: 'instans_name'
+    metrics_path: '/metrics'
+    scrape_interval: 10s
+    scrape_timeout: 5s
+    static_configs:
+      - targets: ['host:pors']
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: instance
+      - target_label: job
+        replacement: 'instans'
+
+  # ─── Node Exporter (хост метрики) ───
+  - job_name: 'node-exporter'
+    metrics_path: '/metrics'
+    scrape_interval: 30s
+    scrape_timeout: 10s
+    static_configs:
+      - targets: ['node-exporter:9100']
+    relabel_configs:
+      - target_label: job
+        replacement: 'node'
+
+  # ─── Prometheus Self ───
+  - job_name: 'prometheus'
+    metrics_path: '/metrics'
+    scrape_interval: 15s
+    scrape_timeout: 5s
+    static_configs:
+      - targets: ['localhost:9090']
+    relabel_configs:
+      - target_label: job
+        replacement: 'prometheus'

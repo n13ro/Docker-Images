@@ -1,0 +1,42 @@
+services:
+  vault:
+    image: hashicorp/vault:latest
+    container_name: vault
+    restart: unless-stopped
+    ports:
+      - "8200:8200"
+    environment:
+      VAULT_ADDR: "http://0.0.0.0:8200"
+      SKIP_CHOWN: "true"
+      VAULT_LOCAL_CONFIG: |
+              ui = true
+              storage "file" {
+                path = "/vault/data"
+              }
+              listener "tcp" {
+                address     = "0.0.0.0:8200"
+                tls_disable = 1
+              }
+              api_addr = "http://vault:8200"
+              disable_mlock = true
+    cap_add:
+      - IPC_LOCK
+    volumes:
+      - ./vault/config.hcl:/vault/config/config.hcl:ro
+      - vault-data:/vault/data
+    command: server
+    depends_on:
+      vault-data-fixer:
+        condition: service_completed_successfully
+
+  vault-data-fixer:
+    image: hashicorp/vault:latest
+    container_name: vault-data-fixer
+    user: root
+    entrypoint: /bin/sh -c "chown -R vault:vault /vault/data && echo 'Vault data permissions fixed'"
+    volumes:
+      - vault-data:/vault/data
+
+volumes:
+  vault-data:
+    driver: local

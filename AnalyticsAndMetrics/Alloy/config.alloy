@@ -1,0 +1,101 @@
+// ─── Docker: обнаружение контейнеров ───
+discovery.docker "containers" {
+  host             = "unix:///var/run/docker.sock"
+  refresh_interval = "5s"
+}
+
+// ─── Docker: перемаркировка меток (аналог relabel_configs) ───
+discovery.relabel "docker_logs" {
+  targets = discovery.docker.containers.targets
+
+  rule {
+    source_labels = ["__meta_docker_container_name"]
+    regex         = "/(.*)"
+    target_label  = "container"
+    replacement   = "${1}"
+  }
+
+  rule {
+    source_labels = ["__meta_docker_container_label_com_docker_compose_service"]
+    target_label  = "service"
+  }
+
+  rule {
+    source_labels = ["__meta_docker_container_label_app"]
+    target_label  = "app"
+  }
+
+  rule {
+    source_labels = ["__meta_docker_container_label_com_docker_compose_project"]
+    target_label  = "project"
+  }
+}
+
+// ─── Docker: чтение логов ───
+loki.source.docker "containers" {
+  host       = "unix:///var/run/docker.sock"
+  targets    = discovery.relabel.docker_logs.output
+  labels     = { job = "docker", }
+  forward_to = [loki.write.loki_endpoint.receiver]
+}
+
+// ─── Journal: relabel-правила (unit, level) ───
+discovery.relabel "journal" {
+  targets = []
+
+  rule {
+    source_labels = ["__journal__systemd_unit"]
+    target_label  = "unit"
+  }
+
+  rule {
+    source_labels = ["__journal_priority_keyword"]
+    target_label  = "level"
+  }
+}
+
+// ─── Journal: чтение системных логов ───
+loki.source.journal "systemd" {
+  path          = "/var/log/journal"
+  labels        = { job = "systemd-journal", }
+  relabel_rules = discovery.relabel.journal.rules
+  forward_to    = [loki.process.systemd_pipeline.receiver]
+}
+
+// ─── Journal: pipeline stages (json → timestamp → labels) ───
+loki.process "systemd_pipeline" {
+  forward_to = [loki.write.loki_endpoint.receiver]
+
+  stage.json {
+    expressions = {
+      time = "time",
+      host = "_HOSTNAME",
+      unit = "_SYSTEMD_UNIT",
+    }
+  }
+
+  stage.timestamp {
+    source = "time"
+    format = "Unix"
+  }
+
+  stage.labels {
+    values = {
+      host = "host",
+      unit = "unit",
+    }
+  }
+}
+
+// ─── Отправка в Loki ───
+loki.write "loki_endpoint" {
+  endpoint {
+    url       = "http://loki:3100/loki/api/v1/push"
+    tenant_id = "docker"
+  }
+}
+
+// ─── UI для отладки (открывается на :12345) ───
+livedebugging {
+  enabled = true
+}
